@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mazo Wavelength</title>
+  <meta name="description" content="Saca cartas de espectro al azar, sin repetir hasta volver a barajar.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Mazo de espectros</h1>
+      <p id="counter" class="counter" aria-live="polite">Cargando…</p>
+    </header>
+
+    <button id="card" class="card empty" type="button" aria-label="Sacar carta">
+      <span class="side left" id="left">Tocá para sacar una carta</span>
+      <span class="divider" aria-hidden="true">↔</span>
+      <span class="side right" id="right"></span>
+    </button>
+
+    <div class="actions">
+      <button id="draw" class="primary" type="button">Sacar carta</button>
+      <button id="flip" type="button" title="Intercambiar extremos" disabled>Invertir</button>
+      <button id="shuffle" type="button">Barajar</button>
+    </div>
+
+    <p class="hint">Atajos: <kbd>Espacio</kbd> saca una carta · <kbd>B</kbd> baraja</p>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
