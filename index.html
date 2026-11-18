@@ -14,7 +14,17 @@
       <p id="counter" class="counter" aria-live="polite">Cargando…</p>
     </header>
 
+    <details class="categories">
+      <summary id="cat-summary">Categorías</summary>
+      <div class="chips" id="chips"></div>
+      <div class="cat-actions">
+        <button id="cat-all" type="button">Todas</button>
+        <button id="cat-none" type="button">Ninguna</button>
+      </div>
+    </details>
+
     <button id="card" class="card empty" type="button" aria-label="Sacar carta">
+      <span class="badge" id="category"></span>
       <span class="side left" id="left">Tocá para sacar una carta</span>
       <span class="divider" aria-hidden="true">↔</span>
       <span class="side right" id="right"></span>

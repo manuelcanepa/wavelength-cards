@@ -2,6 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "wavelength-deck";
+  const CATEGORIES_KEY = "wavelength-categories";
 
   const el = {
     card: document.getElementById("card"),
@@ -11,9 +12,16 @@
     draw: document.getElementById("draw"),
     flip: document.getElementById("flip"),
     shuffle: document.getElementById("shuffle"),
+    category: document.getElementById("category"),
+    chips: document.getElementById("chips"),
+    catSummary: document.getElementById("cat-summary"),
+    catAll: document.getElementById("cat-all"),
+    catNone: document.getElementById("cat-none"),
   };
 
-  let cards = [];
+  let categories = []; // [{ id, name, emoji, default, cards }]
+  let selected = new Set();
+  let cards = []; // cartas de las categorías elegidas: { left, right, cat }
   // state: { order: number[], position: number, hash: string, flipped: boolean }
   let state = null;
 
@@ -66,6 +74,62 @@
     return null;
   }
 
+  // --- Categorías -----------------------------------------------------------
+
+  function normalize(data) {
+    // Compatibilidad: un array plano de cartas es una sola categoría.
+    if (Array.isArray(data) && data.length && !Array.isArray(data[0].cards)) {
+      data = [{ id: "general", name: "General", emoji: "🃏", cards: data }];
+    }
+    return data
+      .filter((c) => c && c.id && Array.isArray(c.cards))
+      .map((c) => ({ ...c, cards: c.cards.filter((x) => x && x.left && x.right) }))
+      .filter((c) => c.cards.length > 0);
+  }
+
+  function loadSelection() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(CATEGORIES_KEY));
+      if (Array.isArray(saved)) return new Set(saved.filter((id) => categories.some((c) => c.id === id)));
+    } catch (_) { /* sin selección guardada */ }
+    return new Set(categories.filter((c) => c.default !== false).map((c) => c.id));
+  }
+
+  function saveSelection() {
+    try { localStorage.setItem(CATEGORIES_KEY, JSON.stringify([...selected])); } catch (_) { /* sin persistencia */ }
+  }
+
+  function buildCards() {
+    cards = categories
+      .filter((c) => selected.has(c.id))
+      .flatMap((c) => c.cards.map((x) => ({ left: x.left, right: x.right, cat: `${c.emoji} ${c.name}` })));
+  }
+
+  function applySelection() {
+    saveSelection();
+    buildCards();
+    state = cards.length ? load(hashCards(cards)) || null : null;
+    if (cards.length && !state) newDeck();
+    renderChips();
+    render(false);
+  }
+
+  function renderChips() {
+    el.chips.replaceChildren(...categories.map((c) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip";
+      b.setAttribute("aria-pressed", String(selected.has(c.id)));
+      b.textContent = `${c.emoji} ${c.name} (${c.cards.length})`;
+      b.addEventListener("click", () => {
+        if (selected.has(c.id)) selected.delete(c.id); else selected.add(c.id);
+        applySelection();
+      });
+      return b;
+    }));
+    el.catSummary.textContent = `Categorías (${selected.size}/${categories.length})`;
+  }
+
   // --- Mazo -----------------------------------------------------------------
 
   function newDeck() {
@@ -83,7 +147,7 @@
   }
 
   function drawCard() {
-    if (remaining() <= 0) return;
+    if (!state || remaining() <= 0) return;
     state.position += 1;
     state.flipped = false;
     save();
@@ -91,6 +155,7 @@
   }
 
   function reshuffle() {
+    if (!state) return;
     const inProgress = state.position > 0 && remaining() > 0;
     if (inProgress && !confirm(`Quedan ${remaining()} cartas. ¿Barajar de nuevo todo el mazo?`)) return;
     newDeck();
@@ -107,21 +172,32 @@
   // --- Render ---------------------------------------------------------------
 
   function render(animate) {
+    el.card.classList.remove("flip-in", "empty", "done");
+
+    if (!state) {
+      el.card.classList.add("empty");
+      el.left.textContent = "Elegí al menos una categoría";
+      el.right.textContent = el.category.textContent = "";
+      el.counter.textContent = "Sin categorías elegidas";
+      el.draw.disabled = el.flip.disabled = el.shuffle.disabled = true;
+      return;
+    }
+    el.shuffle.disabled = false;
+
     const card = currentCard();
     const total = cards.length;
     const left = remaining();
 
-    el.card.classList.remove("flip-in", "empty", "done");
-
     if (!card) {
       el.card.classList.add("empty");
       el.left.textContent = "Tocá para sacar una carta";
-      el.right.textContent = "";
+      el.right.textContent = el.category.textContent = "";
     } else {
+      el.category.textContent = card.cat;
       const [a, b] = state.flipped ? [card.right, card.left] : [card.left, card.right];
       el.left.textContent = a;
       el.right.textContent = b;
-      el.card.setAttribute("aria-label", `${a} contra ${b}. Tocá para sacar otra carta`);
+      el.card.setAttribute("aria-label", `${card.cat}: ${a} contra ${b}. Tocá para sacar otra carta`);
     }
 
     if (card && left === 0) {
@@ -148,9 +224,12 @@
   el.card.addEventListener("click", drawCard);
   el.flip.addEventListener("click", toggleFlip);
   el.shuffle.addEventListener("click", reshuffle);
+  el.catAll.addEventListener("click", () => { selected = new Set(categories.map((c) => c.id)); applySelection(); });
+  el.catNone.addEventListener("click", () => { selected = new Set(); applySelection(); });
 
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target.closest && e.target.closest(".categories")) return; // no robar teclas a los chips
     if (e.code === "Space" || e.key === "Enter") {
       e.preventDefault();
       drawCard();
@@ -167,11 +246,10 @@
       return r.json();
     })
     .then((data) => {
-      cards = data.filter((c) => c && c.left && c.right);
-      if (cards.length === 0) throw new Error("cards.json no tiene cartas válidas");
-      state = load(hashCards(cards));
-      if (!state) newDeck();
-      render(false);
+      categories = normalize(data);
+      if (categories.length === 0) throw new Error("cards.json no tiene cartas válidas");
+      selected = loadSelection();
+      applySelection();
     })
     .catch((err) => {
       el.counter.textContent = `No se pudieron cargar las cartas: ${err.message}`;

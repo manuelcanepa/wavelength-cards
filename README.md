@@ -12,15 +12,24 @@ así que podés recargar la página sin perder la posición.
 
 ## Editar las cartas
 
-Las cartas están en [`cards.json`](cards.json):
+Las cartas están en [`cards.json`](cards.json), agrupadas por categoría:
 
 ```json
 [
-  { "left": "Frío", "right": "Caliente" }
+  {
+    "id": "comida", "name": "Comida", "emoji": "🍕", "default": true,
+    "cards": [
+      { "left": "Comida horrible", "right": "Comida espectacular" }
+    ]
+  }
 ]
 ```
 
-Si modificás el archivo, el mazo se baraja automáticamente la próxima vez que se abra la página.
+- `id` tiene que ser único; se usa para recordar qué categorías elegiste.
+- `"default": false` deja la categoría desactivada hasta que alguien la active (por ejemplo, *Picantes*).
+
+En la página, **Categorías** permite elegir qué entra en el mazo; la elección se guarda en el navegador.
+Cambiar las categorías, o modificar el archivo, vuelve a barajar el mazo.
 
 ## Probar en local
 
